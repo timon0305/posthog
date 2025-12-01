@@ -1,13 +1,13 @@
-import { CopyToClipboardInline } from 'lib/components/CopyToClipboard'
 import { LemonTableLink } from 'lib/lemon-ui/LemonTable/LemonTableLink'
 import { humanFriendlyNumber } from 'lib/utils'
-import stringWithWBR from 'lib/utils/stringWithWBR'
 import { currencyFormatter } from 'scenes/billing/billing-utils'
 import { PersonDisplay } from 'scenes/persons/PersonDisplay'
 import { urls } from 'scenes/urls'
 
 import { GroupsQuery } from '~/queries/schema/schema-general'
 import { QueryContext } from '~/queries/types'
+
+import { GroupNameCell } from 'products/customer_analytics/frontend/components/GroupNameCell'
 
 export function getCRMColumns(groupTypeName: string, groupTypeIndex: number): QueryContext['columns'] {
     return {
@@ -17,18 +17,7 @@ export function getCRMColumns(groupTypeName: string, groupTypeIndex: number): Qu
                 const sourceQuery = query.source as GroupsQuery
                 const keyIndex = sourceQuery?.select?.indexOf('key') ?? -1
                 const groupKey = (record as string[])[keyIndex]
-                return (
-                    <div className="min-w-40">
-                        <LemonTableLink to={urls.group(groupTypeIndex, groupKey)} title={value as string} />
-                        <CopyToClipboardInline
-                            explicitValue={groupKey}
-                            iconStyle={{ color: 'var(--color-accent)' }}
-                            description="group id"
-                        >
-                            {stringWithWBR(groupKey, 100)}
-                        </CopyToClipboardInline>
-                    </div>
-                )
+                return <GroupNameCell groupName={value as string} groupKey={groupKey} groupTypeIndex={groupTypeIndex} />
             },
         },
         arr: {
