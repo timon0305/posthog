@@ -48,6 +48,19 @@ pub struct Config {
     #[envconfig(default = "5000")]
     pub redis_connection_timeout_ms: u64,
 
+    // Event restrictions configuration (reads from Redis, synced by Django)
+    #[envconfig(default = "false")]
+    pub event_restrictions_enabled: bool,
+
+    /// Redis URL for event restrictions (separate from main redis_url)
+    pub event_restrictions_redis_url: Option<String>,
+
+    #[envconfig(default = "30")]
+    pub event_restrictions_refresh_interval_secs: u64,
+
+    #[envconfig(default = "300")]
+    pub event_restrictions_fail_open_after_secs: u64,
+
     pub otel_url: Option<String>,
 
     #[envconfig(default = "false")]
