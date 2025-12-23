@@ -11,6 +11,11 @@ import { ActionFilter, CompareLabelType, FilterType, IntervalType } from '~/type
 
 import { formatBreakdownLabel } from '../utils'
 
+export interface AnomalyInfo {
+    score: number | null
+    alertName: string
+}
+
 export interface SeriesDatum {
     id: number // determines order that series will be displayed in
     dataIndex: number
@@ -25,6 +30,7 @@ export interface SeriesDatum {
     count: number
     filter?: FilterType
     hideTooltip?: boolean
+    anomalyInfo?: AnomalyInfo
 }
 
 // Describes the row-by-row data for insight tooltips in the situation where series
