@@ -182,6 +182,7 @@ async fn setup_ai_router_with_restriction(
         Some(create_mock_blob_storage()),
         Some(10),
         None,
+        256, // body_read_chunk_size_kb
     );
 
     (router, sink_clone)
