@@ -49,13 +49,14 @@ class ConversationMinimalSerializer(serializers.ModelSerializer):
 class ConversationSerializer(ConversationMinimalSerializer):
     class Meta:
         model = Conversation
-        fields = [*_conversation_fields, "messages", "has_unsupported_content", "agent_mode", "pending_approvals"]
+        fields = [*_conversation_fields, "messages", "has_unsupported_content", "agent_mode", "pending_approvals", "supermode"]
         read_only_fields = fields
 
     messages = serializers.SerializerMethodField()
     has_unsupported_content = serializers.SerializerMethodField()
     agent_mode = serializers.SerializerMethodField()
     pending_approvals = serializers.SerializerMethodField()
+    supermode = serializers.SerializerMethodField()
 
     def get_messages(self, conversation: Conversation) -> list[dict[str, Any]]:
         state, _, _ = self._get_cached_state(conversation)
@@ -83,6 +84,12 @@ class ConversationSerializer(ConversationMinimalSerializer):
         state, _, _ = self._get_cached_state(conversation)
         if state:
             return state.agent_mode_or_default
+        return None
+
+    def get_supermode(self, conversation: Conversation) -> str | None:
+        state, _, _ = self._get_cached_state(conversation)
+        if state:
+            return state.supermode
         return None
 
     def get_pending_approvals(self, conversation: Conversation) -> list[dict[str, Any]]:

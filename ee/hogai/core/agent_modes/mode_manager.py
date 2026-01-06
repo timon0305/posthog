@@ -20,6 +20,7 @@ class AgentModeManager(AssistantContextMixin, ABC):
     _state: AssistantState | None = None
     _node: Optional["AgentExecutable"] = None
     _tools_node: Optional["AgentToolsExecutable"] = None
+    _supermode: AgentMode | None = None
 
     def __init__(
         self,

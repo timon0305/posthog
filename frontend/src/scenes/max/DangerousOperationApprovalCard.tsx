@@ -6,6 +6,7 @@ import { LemonDivider } from '@posthog/lemon-ui'
 
 import { ApprovalCardUIStatus, DangerousOperationResponse } from '~/queries/schema/schema-assistant-messages'
 
+import { MarkdownMessage } from './MarkdownMessage'
 import { OptionSelector } from './components/OptionSelector'
 import { maxThreadLogic } from './maxThreadLogic'
 import { MessageTemplate } from './messages/MessageTemplate'
@@ -123,8 +124,10 @@ export function DangerousOperationApprovalCard({
             </div>
 
             <div className="p-2 pb-0">
-                <p className="text-secondary mb-3">This operation will make the following changes:</p>
-                <pre className="bg-bg-light rounded whitespace-pre-wrap font-mono m-0">{operation.preview}</pre>
+                {operation.toolName !== 'finalize_plan' && (
+                    <p className="text-secondary mb-3">This operation will make the following changes:</p>
+                )}
+                <MarkdownMessage content={operation.preview} id={`approval-${operation.proposalId}`} />
             </div>
 
             <LemonDivider />

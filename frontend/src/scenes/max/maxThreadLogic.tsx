@@ -190,6 +190,7 @@ export const maxThreadLogic = kea<maxThreadLogicType>([
         setDeepResearchMode: (deepResearchMode: boolean) => ({ deepResearchMode }),
         setAgentMode: (agentMode: AgentMode | null) => ({ agentMode }),
         syncAgentModeFromConversation: (agentMode: AgentMode | null) => ({ agentMode }),
+        syncSupermodeFromConversation: (supermode: AgentMode | null) => ({ supermode }),
         setSupportOverrideEnabled: (enabled: boolean) => ({ enabled }),
         processNotebookUpdate: (notebookId: string, notebookContent: JSONContent) => ({ notebookId, notebookContent }),
         appendMessageToConversation: (message: string) => ({ message }),
@@ -281,6 +282,13 @@ export const maxThreadLogic = kea<maxThreadLogicType>([
             {
                 setAgentMode: (_, { agentMode }) => agentMode,
                 syncAgentModeFromConversation: (_, { agentMode }) => agentMode,
+            },
+        ],
+
+        supermode: [
+            null as AgentMode | null,
+            {
+                syncSupermodeFromConversation: (_, { supermode }) => supermode,
             },
         ],
 
@@ -638,6 +646,11 @@ export const maxThreadLogic = kea<maxThreadLogicType>([
                 actions.syncAgentModeFromConversation(conversation.agent_mode as AgentMode)
             }
             // Note: pending approvals loading is handled in the reducer (pendingApprovalsData.setConversation)
+            // Only sync supermode when it's explicitly set in the conversation (from backend API)
+            // Don't sync when undefined (from local status updates like completeThreadGeneration)
+            if (conversation?.supermode !== undefined) {
+                actions.syncSupermodeFromConversation((conversation.supermode as AgentMode) ?? null)
+            }
         },
         askMax: async ({ prompt, addToThread = true, uiContext }) => {
             // Only process if this thread is the currently active one
@@ -782,6 +795,10 @@ export const maxThreadLogic = kea<maxThreadLogicType>([
             actions.setConversation(newConversation)
             actions.updateGlobalConversationCache(newConversation)
 
+            // Fetch the full conversation to get state fields like supermode
+            // (these aren't included in the streaming response)
+            actions.loadConversation(values.conversation.id)
+
             // Must go last. Otherwise, the logic will be unmounted before the lifecycle finishes.
             if (values.activeThreadKey !== values.conversationId && cache.unmount) {
                 cache.unmount()
@@ -789,7 +806,10 @@ export const maxThreadLogic = kea<maxThreadLogicType>([
         },
 
         loadConversationHistorySuccess: ({ conversationHistory, payload }) => {
-            if (payload?.doNotUpdateCurrentThread || values.autoRun || values.streamingActive) {
+            // payload is an object with doNotUpdateCurrentThread for loadConversationHistory,
+            // but it's a string (conversationId) for loadConversation
+            const doNotUpdate = typeof payload === 'object' && payload?.doNotUpdateCurrentThread
+            if (doNotUpdate || values.autoRun || values.streamingActive) {
                 return
             }
             // Don't auto-reconnect if there's a pending form
@@ -797,7 +817,14 @@ export const maxThreadLogic = kea<maxThreadLogicType>([
                 return
             }
             const conversation = conversationHistory.find((c) => c.id === values.conversationId)
-            if (conversation?.status === ConversationStatus.InProgress) {
+            if (!conversation) {
+                return
+            }
+
+            // Sync conversation data including supermode
+            actions.setConversation(conversation)
+
+            if (conversation.status === ConversationStatus.InProgress) {
                 setTimeout(() => {
                     actions.reconnectToStream()
                 }, 0)

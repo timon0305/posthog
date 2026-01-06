@@ -435,12 +435,15 @@ export type AssistantTool =
     | 'upsert_dashboard'
     | 'manage_memories'
     | 'create_notebook'
+    | 'finalize_plan'
 
 export enum AgentMode {
     ProductAnalytics = 'product_analytics',
     SQL = 'sql',
     SessionReplay = 'session_replay',
     ErrorTracking = 'error_tracking',
+    Plan = 'plan',
+    Execution = 'execution',
 }
 
 export enum SlashCommandName {

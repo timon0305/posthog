@@ -39,6 +39,8 @@ class AgentMode(StrEnum):
     SQL = "sql"
     SESSION_REPLAY = "session_replay"
     ERROR_TRACKING = "error_tracking"
+    PLAN = "plan"
+    EXECUTION = "execution"
 
 
 class AggregationAxisFormat(StrEnum):
@@ -349,6 +351,7 @@ class AssistantTool(StrEnum):
     UPSERT_DASHBOARD = "upsert_dashboard"
     MANAGE_MEMORIES = "manage_memories"
     CREATE_NOTEBOOK = "create_notebook"
+    FINALIZE_PLAN = "finalize_plan"
 
 
 class AssistantToolCall(BaseModel):
