@@ -49,6 +49,7 @@ import { insightDataLogic } from './insightDataLogic'
 import type { insightLogicType } from './insightLogicType'
 import { getInsightId } from './utils'
 import { insightsApi } from './utils/api'
+import { compareQuery } from './utils/queryUtils'
 
 export const UNSAVED_INSIGHT_MIN_REFRESH_INTERVAL_MINUTES = 3
 
@@ -502,7 +503,12 @@ export const insightLogic: LogicWrapper<insightLogicType> = kea<insightLogicType
             // the backend can't return the result for a query based insight,
             // and so we shouldn't copy the result from `values.insight` as it might be stale
             const result = savedInsight.result || (values.query ? values.insight.result : null)
-            actions.setInsight({ ...savedInsight, result: result }, { fromPersistentApi: true, overrideQuery: true })
+            // Only override query if the query actually changed - avoid refreshing data when only name/description changed
+            const queryChanged =
+                !values.savedInsight.query ||
+                !values.query ||
+                !compareQuery(values.savedInsight.query, values.query)
+            actions.setInsight({ ...savedInsight, result: result }, { fromPersistentApi: true, overrideQuery: queryChanged })
             eventUsageLogic.actions.reportInsightSaved(savedInsight, values.query, insightNumericId === undefined)
             lemonToast.success(`Insight saved${dashboards?.length === 1 ? ' & added to dashboard' : ''}`, {
                 button: {
