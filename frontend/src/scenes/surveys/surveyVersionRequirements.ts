@@ -12,6 +12,8 @@ import {
     SurveyType,
 } from '~/types'
 
+import { SURVEY_RATING_SCALE } from './constants'
+
 export type SurveySdkType = 'posthog-js' | 'posthog-react-native' | 'posthog-ios' | 'posthog-android'
 
 export type SdkVersionRequirements = Partial<Record<SurveySdkType, string>>
@@ -127,6 +129,15 @@ export const SURVEY_SDK_REQUIREMENTS: SurveyFeatureRequirement[] = [
             s.appearance?.textColor !== undefined ||
             s.appearance?.inputTextColor !== undefined ||
             s.appearance?.submitButtonTextColor !== undefined,
+    },
+    {
+        feature: 'Thumbs up/down question',
+        sdkVersions: { 'posthog-js': '1.326.0', 'posthog-react-native': '4.19.0' },
+        unsupportedSdks: ['posthog-ios', 'posthog-android'],
+        check: (s) =>
+            s.questions.some(
+                (q) => q.type === SurveyQuestionType.Rating && q.scale === SURVEY_RATING_SCALE.THUMB_2_POINT
+            ),
     },
 ]
 
