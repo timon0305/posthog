@@ -188,7 +188,7 @@ dependencies = [
     "bingads>=13.0.25.3",
     "markdown-to-mrkdwn>=0.2.0",
     "botocore[crt]>=1.40.49",
-    "hdbscan>=0.8.40",
+    "fast-hdbscan==0.2.*",
 ]
 
 [dependency-groups]
