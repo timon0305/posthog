@@ -38,7 +38,12 @@ class EndpointVersion(models.Model):
     version = models.IntegerField()
     query = models.JSONField(help_text="Immutable query snapshot")
     created_at = models.DateTimeField(auto_now_add=True)
-    created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name="endpoint_versions_created")
+    created_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name="endpoint_versions_created",
+    )
 
     class Meta:
         db_table = "endpoints_endpointversion"
@@ -70,7 +75,9 @@ class Endpoint(CreatedMetaFields, UpdatedMetaFields, UUIDTModel):
     """
 
     name = models.CharField(
-        max_length=128, validators=[validate_endpoint_name], help_text="URL-safe name for the endpoint"
+        max_length=128,
+        validators=[validate_endpoint_name],
+        help_text="URL-safe name for the endpoint",
     )
     team = models.ForeignKey(Team, on_delete=models.CASCADE)
 
@@ -89,7 +96,9 @@ class Endpoint(CreatedMetaFields, UpdatedMetaFields, UUIDTModel):
 
     # Parameter schema for query customization
     parameters = models.JSONField(
-        default=dict, blank=True, help_text="JSON schema defining expected parameters for query customization"
+        default=dict,
+        blank=True,
+        help_text="JSON schema defining expected parameters for query customization",
     )
 
     is_active = models.BooleanField(default=True, help_text="Whether this endpoint is available via the API")
@@ -207,10 +216,18 @@ class Endpoint(CreatedMetaFields, UpdatedMetaFields, UUIDTModel):
 
         if query_kind not in MATERIALIZABLE_QUERY_TYPES:
             supported = ", ".join(sorted(MATERIALIZABLE_QUERY_TYPES))
-            return False, f"Query type '{query_kind}' cannot be materialized. Supported types: {supported}"
+            return (
+                False,
+                f"Query type '{query_kind}' cannot be materialized. Supported types: {supported}",
+            )
 
         if self.query.get("variables"):
-            return False, "Queries with variables cannot be materialized."
+            from products.endpoints.backend.materialization import analyze_variables_for_materialization
+
+            can_materialize, reason, _ = analyze_variables_for_materialization(self.query)
+
+            if not can_materialize:
+                return False, f"Variables not supported: {reason}"
 
         if query_kind == "HogQLQuery":
             hogql_query = self.query.get("query")

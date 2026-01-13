@@ -34,6 +34,7 @@ from posthog.schema import (
 from posthog.hogql import ast
 from posthog.hogql.constants import LimitContext
 from posthog.hogql.errors import ExposedHogQLError, ResolutionError
+from posthog.hogql.parser import parse_select
 from posthog.hogql.property import property_to_expr
 
 from posthog.api.documentation import extend_schema
@@ -61,7 +62,12 @@ from products.data_warehouse.backend.models.external_data_schema import (
     sync_frequency_interval_to_sync_frequency,
     sync_frequency_to_sync_frequency_interval,
 )
-from products.endpoints.backend.materialization import convert_insight_query_to_hogql
+from products.endpoints.backend.materialization import (
+    analyze_variables_for_materialization,
+    convert_insight_query_to_hogql,
+    transform_query_for_materialization,
+    transform_select_for_materialized_table,
+)
 from products.endpoints.backend.models import Endpoint, EndpointVersion
 from products.endpoints.backend.openapi import generate_openapi_spec
 from products.endpoints.backend.rate_limit import (
@@ -422,12 +428,24 @@ class EndpointViewSet(TeamAndOrgViewSetMixin, PydanticModelMixin, viewsets.Model
             )
 
         hogql_query = convert_insight_query_to_hogql(endpoint.query, self.team)
+
+        variable_info = None
+        if endpoint.query.get("variables"):
+            can_materialize, reason, variable_info = analyze_variables_for_materialization(endpoint.query)
+
+            if can_materialize and variable_info is not None:
+                try:
+                    hogql_query = transform_query_for_materialization(hogql_query, variable_info, self.team)
+                except Exception as e:
+                    raise ValidationError(f"Failed to transform query for materialization: {str(e)}")
+
         saved_query.query = hogql_query
         saved_query.external_tables = saved_query.s3_tables
         saved_query.is_materialized = True
         saved_query.sync_frequency_interval = (
             sync_frequency_to_sync_frequency_interval(sync_frequency.value) if sync_frequency else timedelta(hours=12)
         )
+
         saved_query.save()
         saved_query.schedule_materialization()
 
@@ -492,8 +510,20 @@ class EndpointViewSet(TeamAndOrgViewSetMixin, PydanticModelMixin, viewsets.Model
             if timezone.now() >= next_refresh_due:
                 return False
 
+        materialized_var = self._get_materialized_variable(endpoint)
+
         if data.variables:
-            return False
+            # Check if the variable matches the materialized variable
+            if not materialized_var:
+                # Variables in request but none materialized
+                return False
+
+            request_var_codes = set(data.variables.keys())
+            if request_var_codes != {materialized_var.code_name}:
+                # Different variable or multiple variables
+                return False
+
+            # Variable matches - can use materialized table
 
         # 'direct' mode explicitly bypasses materialization to run the original query
         if data.refresh == EndpointRefreshMode.DIRECT:
@@ -503,6 +533,18 @@ class EndpointViewSet(TeamAndOrgViewSetMixin, PydanticModelMixin, viewsets.Model
             return False
 
         return True
+
+    def _get_materialized_variable(self, endpoint: Endpoint):
+        """Return the materializable variable info for an endpoint query, if any."""
+        if not endpoint.query or not endpoint.query.get("variables"):
+            return None
+
+        try:
+            can_materialize, _, variable_info = analyze_variables_for_materialization(endpoint.query)
+            return variable_info if can_materialize else None
+        except Exception:
+            # If parsing fails we treat this as not materializable for safety
+            return None
 
     def _execute_query_and_respond(
         self,
@@ -595,15 +637,43 @@ class EndpointViewSet(TeamAndOrgViewSetMixin, PydanticModelMixin, viewsets.Model
             if not saved_query:
                 raise ValidationError("No materialized query found for this endpoint")
 
+            original_query_str = endpoint.query.get("query")
+
+            original_ast = parse_select(original_query_str)
+            if not isinstance(original_ast, ast.SelectQuery):
+                raise ValidationError("Query must be a SELECT statement")
+
+            materialized_select = transform_select_for_materialized_table(original_ast.select, self.team)
+
             select_query = ast.SelectQuery(
-                select=[ast.Field(chain=["*"])],
+                select=materialized_select,
                 select_from=ast.JoinExpr(table=ast.Field(chain=[saved_query.name])),
             )
+
+            materialized_var = self._get_materialized_variable(endpoint)
+
+            if data.variables and materialized_var:
+                var_value = data.variables.get(materialized_var.code_name)
+
+                if var_value is not None:
+                    variable_filter = ast.CompareOperation(
+                        left=ast.Field(chain=[materialized_var.code_name]),
+                        op=ast.CompareOperationOp.Eq,
+                        right=ast.Constant(value=var_value),
+                    )
+
+                    if select_query.where:
+                        select_query.where = ast.And(exprs=[select_query.where, variable_filter])
+                    else:
+                        select_query.where = variable_filter
 
             if data.filters_override and data.filters_override.properties:
                 try:
                     property_expr = property_to_expr(data.filters_override.properties, self.team)
-                    select_query.where = property_expr
+                    if select_query.where:
+                        select_query.where = ast.And(exprs=[select_query.where, property_expr])
+                    else:
+                        select_query.where = property_expr
                 except Exception:
                     raise ValidationError("Failed to apply property filters.")
 
