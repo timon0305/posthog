@@ -24,7 +24,7 @@ export function TaskTracker(): JSX.Element {
     const isEnabled = useFeatureFlag('TASKS')
     const { isDev } = useValues(preflightLogic)
     const { isRunningClustering } = useValues(taskTrackerSceneLogic)
-    const { inferTasks } = useActions(taskTrackerSceneLogic)
+    const { devOnlyInferTasks } = useActions(taskTrackerSceneLogic)
 
     if (!isEnabled) {
         return <NotFound object="Tasks" caption="This feature is not enabled for your project." />
@@ -36,7 +36,7 @@ export function TaskTracker(): JSX.Element {
                 icon={<IconBug />}
                 size="small"
                 type="secondary"
-                onClick={() => inferTasks()}
+                onClick={() => devOnlyInferTasks()}
                 loading={isRunningClustering}
                 data-attr="run-task-clustering-button"
             >
