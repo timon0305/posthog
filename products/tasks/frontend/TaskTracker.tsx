@@ -23,7 +23,7 @@ export const scene: SceneExport = {
 export function TaskTracker(): JSX.Element {
     const isEnabled = useFeatureFlag('TASKS')
     const { isDev } = useValues(preflightLogic)
-    const { isRunningClustering } = useValues(taskTrackerSceneLogic)
+    const { devOnlyIsRunningClustering } = useValues(taskTrackerSceneLogic)
     const { devOnlyInferTasks } = useActions(taskTrackerSceneLogic)
 
     if (!isEnabled) {
@@ -37,7 +37,7 @@ export function TaskTracker(): JSX.Element {
                 size="small"
                 type="secondary"
                 onClick={() => devOnlyInferTasks()}
-                loading={isRunningClustering}
+                loading={devOnlyIsRunningClustering}
                 data-attr="run-task-clustering-button"
             >
                 Run task clusterization on last 7 days
