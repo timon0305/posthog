@@ -18,7 +18,7 @@ import {
 } from '~/types'
 
 import type { batchExportConfigurationLogicType } from './batchExportConfigurationLogicType'
-import { humanizeBatchExportName } from './utils'
+import { dayAndHourToIntervalOffset, humanizeBatchExportName } from './utils'
 
 // Bucket naming rules (supports both S3 and GCS):
 // S3: https://docs.aws.amazon.com/AmazonS3/latest/userguide/bucketnamingrules.html
@@ -611,9 +611,9 @@ export const batchExportConfigurationLogic = kea<batchExportConfigurationLogicTy
         }
         return `NEW:${service}`
     }),
-    path((id) => ['scenes', 'data-pipelines', 'batch-exports', 'batchExportConfigurationLogic', id]),
+    path((key) => ['scenes', 'data-pipelines', 'batch-exports', 'batchExportConfigurationLogic', key]),
     connect(() => ({
-        values: [teamLogic, ['timezone']],
+        values: [teamLogic, ['timezone', 'weekStartDay']],
     })),
     actions({
         setSavedConfiguration: (configuration: Record<string, any>) => ({ configuration }),
@@ -701,8 +701,9 @@ export const batchExportConfigurationLogic = kea<batchExportConfigurationLogicTy
                         paused,
                         name,
                         interval,
-                        timezone,
-                        interval_offset,
+                        // timezone and interval_offset are only used for day and week intervals
+                        timezone: interval === 'day' || interval === 'week' ? timezone : null,
+                        interval_offset: interval === 'day' || interval === 'week' ? interval_offset : null,
                         model,
                         filters,
                         destination: destinationObj,
@@ -827,8 +828,9 @@ export const batchExportConfigurationLogic = kea<batchExportConfigurationLogicTy
                         paused,
                         name,
                         interval,
-                        timezone,
-                        interval_offset,
+                        // timezone and interval_offset are only used for day and week intervals
+                        timezone: interval === 'day' || interval === 'week' ? timezone : null,
+                        interval_offset: interval === 'day' || interval === 'week' ? interval_offset : null,
                         model,
                         filters,
                         destination: destinationObj,
@@ -1093,11 +1095,23 @@ export const batchExportConfigurationLogic = kea<batchExportConfigurationLogicTy
                         json_config_file: 'The config file is not valid',
                     })
                 }
-            } else if (fieldName === 'interval' && (value === 'day' || value === 'week')) {
-                // Set timezone to team's timezone if not already set when interval is day or week
-                if (!values.configuration.timezone) {
-                    const teamTz = teamLogic.findMounted()?.values.timezone || 'UTC'
-                    actions.setConfigurationValue('timezone', teamTz)
+            } else if (fieldName === 'interval') {
+                // if changing to day or week, set the timezone to the team's timezone if not already set
+                if (value === 'day' || value === 'week') {
+                    // if we didn't have a timezone set before, set it to the team's timezone
+                    if (values.savedConfiguration.interval !== 'day' && values.savedConfiguration.interval !== 'week') {
+                        const teamTz = teamLogic.findMounted()?.values.timezone || 'UTC'
+                        actions.setConfigurationValue('timezone', teamTz)
+                    }
+                    // if changing to week, set the day of the week to the team's week start day
+                    if (value === 'week') {
+                        const weekStartDay = teamLogic.findMounted()?.values.weekStartDay || 0
+                        actions.setConfigurationValue('interval_offset', dayAndHourToIntervalOffset(weekStartDay, 0))
+                    }
+                } else {
+                    // Clear timezone and interval_offset when interval is not day or week
+                    actions.setConfigurationValue('timezone', null)
+                    actions.setConfigurationValue('interval_offset', null)
                 }
             }
         },
