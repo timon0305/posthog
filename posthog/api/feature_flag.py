@@ -2225,7 +2225,7 @@ class FeatureFlagViewSet(
 
         try:
             feature_flag = (
-                FeatureFlag.objects.get(pk=kwargs["pk"])
+                FeatureFlag.objects.get(pk=kwargs["pk"], team__project_id=self.project_id)
                 if is_flag_id_provided
                 else FeatureFlag.objects.get(key=kwargs["pk"], team__project_id=self.project_id)
             )
