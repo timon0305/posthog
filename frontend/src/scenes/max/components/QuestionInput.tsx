@@ -4,9 +4,9 @@ import { offset } from '@floating-ui/react'
 import clsx from 'clsx'
 import { useActions, useValues } from 'kea'
 import posthog from 'posthog-js'
-import React, { ReactNode, useEffect, useState } from 'react'
+import React, { ReactNode, useEffect, useRef, useState } from 'react'
 
-import { IconArrowRight, IconStopFilled } from '@posthog/icons'
+import { IconArrowRight, IconCheck, IconPencil, IconStopFilled, IconTrash, IconX } from '@posthog/icons'
 import { LemonButton, LemonSwitch, LemonTextArea } from '@posthog/lemon-ui'
 
 import { useFeatureFlag } from 'lib/hooks/useFeatureFlag'
@@ -14,6 +14,7 @@ import { AIConsentPopoverWrapper } from 'scenes/settings/organization/AIConsentP
 import { userLogic } from 'scenes/userLogic'
 
 import { KeyboardShortcut } from '~/layout/navigation-3000/components/KeyboardShortcut'
+import { ConversationQueueMessage } from '~/types'
 
 import { ContextDisplay } from '../Context'
 import { maxGlobalLogic } from '../maxGlobalLogic'
@@ -33,6 +34,97 @@ interface QuestionInputProps {
     textAreaRef?: React.RefObject<HTMLTextAreaElement>
     containerClassName?: string
     onSubmit?: () => void
+}
+
+function QueuedMessageItem({
+    message,
+    isEditing,
+    onEdit,
+    onCancel,
+    focusOnEdit,
+    onSave,
+}: {
+    message: ConversationQueueMessage
+    isEditing: boolean
+    onEdit: () => void
+    onCancel: () => void
+    focusOnEdit: boolean
+    onSave: (messageId: string, content: string) => void
+}): JSX.Element {
+    const { deleteQueuedMessage } = useActions(maxThreadLogic)
+    const [draft, setDraft] = useState(message.content)
+    const textAreaRef = useRef<HTMLTextAreaElement | null>(null)
+
+    useEffect(() => {
+        setDraft(message.content)
+    }, [message.content])
+
+    useEffect(() => {
+        if (isEditing && focusOnEdit) {
+            textAreaRef.current?.focus()
+            textAreaRef.current?.select()
+        }
+    }, [focusOnEdit, isEditing])
+
+    const canSave = draft.trim().length > 0
+
+    if (isEditing) {
+        return (
+            <div className="space-y-2">
+                <LemonTextArea
+                    ref={textAreaRef}
+                    value={draft}
+                    onChange={setDraft}
+                    minRows={1}
+                    maxRows={4}
+                    autoFocus
+                    onPressCmdEnter={() => {
+                        if (!canSave) {
+                            return
+                        }
+                        onSave(message.id, draft)
+                    }}
+                />
+                <div className="flex gap-1">
+                    <LemonButton
+                        size="xsmall"
+                        icon={<IconCheck />}
+                        onClick={() => onSave(message.id, draft)}
+                        disabledReason={canSave ? undefined : 'Message cannot be empty'}
+                    >
+                        Save
+                    </LemonButton>
+                    <LemonButton size="xsmall" type="secondary" icon={<IconX />} onClick={onCancel}>
+                        Cancel
+                    </LemonButton>
+                </div>
+            </div>
+        )
+    }
+
+    return (
+        <div className="group flex items-center gap-2 py-1 px-2 rounded-md hover:bg-bg-light">
+            <p className="flex-1 text-sm text-secondary truncate">{message.content}</p>
+            <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                <LemonButton
+                    size="xsmall"
+                    type="tertiary"
+                    icon={<IconPencil className="text-muted" />}
+                    onClick={onEdit}
+                    tooltip="Edit message"
+                />
+                <LemonButton
+                    size="xsmall"
+                    type="tertiary"
+                    icon={<IconTrash className="text-muted" />}
+                    onClick={() => {
+                        deleteQueuedMessage(message.id)
+                    }}
+                    tooltip="Remove from queue"
+                />
+            </div>
+        </div>
+    )
 }
 
 export const QuestionInput = React.forwardRef<HTMLDivElement, QuestionInputProps>(function BaseQuestionInput(
@@ -64,13 +156,21 @@ export const QuestionInput = React.forwardRef<HTMLDivElement, QuestionInputProps
         isImpersonatingExistingConversation,
         supportOverrideEnabled,
         streamingActive,
+        queueingEnabled,
+        queuedMessages,
     } = useValues(maxThreadLogic)
-    const { askMax, stopGeneration, completeThreadGeneration, setSupportOverrideEnabled } = useActions(maxThreadLogic)
+    const { askMax, stopGeneration, completeThreadGeneration, setSupportOverrideEnabled, updateQueuedMessage } =
+        useActions(maxThreadLogic)
     // Show info banner for conversations created during impersonation (marked as internal)
     const isImpersonatedInternalConversation = user?.is_impersonated && conversation?.is_internal
     const isAiUx = useFeatureFlag('AI_UX')
 
     const [showAutocomplete, setShowAutocomplete] = useState(false)
+    const [editingQueueId, setEditingQueueId] = useState<string | null>(null)
+    const [shouldFocusQueueEdit, setShouldFocusQueueEdit] = useState(false)
+    const hasQuestion = question.trim().length > 0
+    const isQueueingSubmission = queueingEnabled && threadLoading && hasQuestion
+    const showStopButton = threadLoading && !isQueueingSubmission
 
     // Update autocomplete visibility when question changes
     useEffect(() => {
@@ -82,7 +182,10 @@ export const QuestionInput = React.forwardRef<HTMLDivElement, QuestionInputProps
     }, [question, showAutocomplete])
 
     const pendingApproval = !dataProcessingAccepted && !threadLoading
-    let disabledReason = !threadLoading ? submissionDisabledReason : undefined
+    let disabledReason = submissionDisabledReason
+    if (threadLoading && !isQueueingSubmission) {
+        disabledReason = undefined
+    }
     if (cancelLoading) {
         disabledReason = 'Cancelling...'
     }
@@ -113,6 +216,37 @@ export const QuestionInput = React.forwardRef<HTMLDivElement, QuestionInputProps
                 {/* Have to increase z-index to overlay ToolsDisplay */}
                 <div className="relative w-full flex flex-col z-1">
                     {children}
+                    {queueingEnabled && queuedMessages.length > 0 && (
+                        <div className="px-3 py-2">
+                            <div className="text-xs text-muted mb-1.5">Up next</div>
+                            <div className="space-y-1.5">
+                                {queuedMessages
+                                    .slice()
+                                    .reverse()
+                                    .map((message) => (
+                                        <QueuedMessageItem
+                                            key={message.id}
+                                            message={message}
+                                            isEditing={editingQueueId === message.id}
+                                            onEdit={() => {
+                                                setEditingQueueId(message.id)
+                                                setShouldFocusQueueEdit(true)
+                                            }}
+                                            onCancel={() => {
+                                                setEditingQueueId(null)
+                                                setShouldFocusQueueEdit(false)
+                                            }}
+                                            focusOnEdit={shouldFocusQueueEdit && editingQueueId === message.id}
+                                            onSave={(messageId, content) => {
+                                                updateQueuedMessage(messageId, content)
+                                                setEditingQueueId(null)
+                                                setShouldFocusQueueEdit(false)
+                                            }}
+                                        />
+                                    ))}
+                            </div>
+                        </div>
+                    )}
                     <label
                         htmlFor="question-input"
                         className={clsx(
@@ -164,9 +298,25 @@ export const QuestionInput = React.forwardRef<HTMLDivElement, QuestionInputProps
                                     value={isSharedThread ? '' : question}
                                     onChange={(value) => setQuestion(value)}
                                     onPressEnter={() => {
-                                        if (question && !submissionDisabledReason && !threadLoading) {
+                                        if (
+                                            hasQuestion &&
+                                            !submissionDisabledReason &&
+                                            (!threadLoading || queueingEnabled)
+                                        ) {
                                             onSubmit?.()
                                             askMax(question)
+                                        }
+                                    }}
+                                    onKeyDown={(event) => {
+                                        if (
+                                            event.key === 'ArrowUp' &&
+                                            !question.trim() &&
+                                            queuedMessages.length > 0 &&
+                                            !editingQueueId
+                                        ) {
+                                            event.preventDefault()
+                                            setEditingQueueId(queuedMessages[0].id)
+                                            setShouldFocusQueueEdit(true)
                                         }
                                     }}
                                     disabled={inputDisabled}
@@ -211,9 +361,17 @@ export const QuestionInput = React.forwardRef<HTMLDivElement, QuestionInputProps
                             hidden={!threadLoading}
                         >
                             <LemonButton
-                                type={(isThreadVisible && !question) || threadLoading ? 'secondary' : 'primary'}
+                                type={(isThreadVisible && !hasQuestion) || showStopButton ? 'secondary' : 'primary'}
                                 onClick={() => {
                                     if (threadLoading) {
+                                        if (isQueueingSubmission) {
+                                            if (submissionDisabledReason) {
+                                                textAreaRef?.current?.focus()
+                                                return
+                                            }
+                                            askMax(question)
+                                            return
+                                        }
                                         stopGeneration()
                                         return
                                     }
@@ -226,9 +384,13 @@ export const QuestionInput = React.forwardRef<HTMLDivElement, QuestionInputProps
                                 tooltip={
                                     tooltipReason ? (
                                         tooltipReason
-                                    ) : threadLoading ? (
+                                    ) : showStopButton ? (
                                         <>
                                             Let's bail <KeyboardShortcut enter />
+                                        </>
+                                    ) : isQueueingSubmission ? (
+                                        <>
+                                            Queue message <KeyboardShortcut enter />
                                         </>
                                     ) : (
                                         <>
@@ -241,7 +403,7 @@ export const QuestionInput = React.forwardRef<HTMLDivElement, QuestionInputProps
                                 className={tooltipReason ? 'opacity-[0.5]' : ''}
                                 size="small"
                                 icon={
-                                    threadLoading ? (
+                                    showStopButton ? (
                                         <IconStopFilled />
                                     ) : (
                                         MAX_SLASH_COMMANDS.find((cmd) => cmd.name === question.split(' ', 1)[0])
