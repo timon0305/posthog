@@ -27,11 +27,14 @@ class OrganizationFeatureFlagView(
     def retrieve(self, request, *args, **kwargs):
         feature_flag_key = kwargs.get(self.lookup_field)
 
-        teams = self.organization.teams.all()
+        # Only return flags from teams the user has access to
+        accessible_team_ids = self.user_permissions.team_ids_visible_for_user
+        org_team_ids = set(self.organization.teams.values_list("id", flat=True))
+        team_ids = list(org_team_ids & set(accessible_team_ids))
 
         flags = FeatureFlag.objects.filter(
             key=feature_flag_key,
-            team_id__in=[team.id for team in teams],
+            team_id__in=team_ids,
             deleted=False,
         )
         flags_data = [
