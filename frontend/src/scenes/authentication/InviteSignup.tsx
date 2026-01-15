@@ -167,7 +167,7 @@ function AuthenticatedAcceptInvite({ invite }: { invite: PrevalidatedInvite }): 
                                 type="primary"
                                 center
                                 fullWidth
-                                onClick={() => acceptInvite()}
+                                onClick={acceptInvite}
                                 loading={acceptedInviteLoading}
                             >
                                 Accept invite
