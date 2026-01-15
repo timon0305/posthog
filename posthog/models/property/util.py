@@ -776,7 +776,7 @@ def filter_element(
             if not isinstance(tag_name, str):
                 raise exceptions.ValidationError("Tag name must be a string")
             param_key = f"{prepend}_{idx}_tag_name_regex"
-            params[param_key] = rf"(^|;){tag_name}(\.|$|;|:)"
+            params[param_key] = rf"(^|;){re.escape(tag_name)}(\.|$|;|:)"
             combination_conditions.append(f"match(elements_chain, %({param_key})s)")
 
     elif key in ["href", "text"]:
