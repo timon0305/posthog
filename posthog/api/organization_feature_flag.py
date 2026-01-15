@@ -1,3 +1,5 @@
+from typing import cast
+
 from rest_framework import mixins, status, viewsets
 from rest_framework.response import Response
 
@@ -7,9 +9,10 @@ from posthog.api.routing import TeamAndOrgViewSetMixin
 from posthog.api.shared import UserBasicSerializer
 from posthog.api.utils import action
 from posthog.helpers.encrypted_flag_payloads import get_decrypted_flag_payloads
-from posthog.models import FeatureFlag, Team
+from posthog.models import FeatureFlag, Team, User
 from posthog.models.cohort import Cohort, CohortOrEmpty
 from posthog.models.filters.filter import Filter
+from posthog.user_permissions import UserPermissions
 
 
 class OrganizationFeatureFlagView(
@@ -28,7 +31,9 @@ class OrganizationFeatureFlagView(
         feature_flag_key = kwargs.get(self.lookup_field)
 
         # Only return flags from teams the user has access to
-        accessible_team_ids = self.user_permissions.team_ids_visible_for_user
+        # Note: We create UserPermissions without a team since this is an organization-level view
+        user_permissions = UserPermissions(cast(User, request.user))
+        accessible_team_ids = user_permissions.team_ids_visible_for_user
         org_team_ids = set(self.organization.teams.values_list("id", flat=True))
         team_ids = list(org_team_ids & set(accessible_team_ids))
 
