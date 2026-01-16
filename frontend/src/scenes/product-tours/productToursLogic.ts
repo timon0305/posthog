@@ -7,6 +7,7 @@ import { lemonToast } from '@posthog/lemon-ui'
 
 import api, { PaginatedResponse } from 'lib/api'
 import { uuid } from 'lib/utils'
+import { eventUsageLogic } from 'lib/utils/eventUsageLogic'
 import { Scene } from 'scenes/sceneTypes'
 import { sceneConfigurations } from 'scenes/scenes'
 import { urls } from 'scenes/urls'
@@ -229,7 +230,9 @@ export interface ProductToursFilters {
 
 export const productToursLogic = kea<productToursLogicType>([
     path(['scenes', 'product-tours', 'productToursLogic']),
-    connect(() => ({})),
+    connect(() => ({
+        actions: [eventUsageLogic, ['reportProductTourCreated', 'reportProductTourListViewed']],
+    })),
     actions({
         setSearchTerm: (searchTerm: string) => ({ searchTerm }),
         setFilters: (filters: Partial<ProductToursFilters>) => ({ filters }),
@@ -290,6 +293,7 @@ export const productToursLogic = kea<productToursLogicType>([
                     name,
                     content: createDefaultAnnouncementContent(),
                 })
+                actions.reportProductTourCreated(announcement, 'app')
                 actions.loadProductTours()
                 router.actions.push(urls.productTour(announcement.id, 'edit=true&tab=steps'))
             } catch {
@@ -302,11 +306,15 @@ export const productToursLogic = kea<productToursLogicType>([
                     name,
                     content: createDefaultBannerContent(),
                 })
+                actions.reportProductTourCreated(banner, 'app')
                 actions.loadProductTours()
                 router.actions.push(urls.productTour(banner.id, 'edit=true&tab=steps'))
             } catch {
                 lemonToast.error('Failed to create banner')
             }
+        },
+        loadProductToursSuccess: () => {
+            actions.reportProductTourListViewed()
         },
     })),
     selectors({
