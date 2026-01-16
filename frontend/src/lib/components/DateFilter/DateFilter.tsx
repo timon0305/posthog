@@ -111,7 +111,6 @@ export function DateFilter({
     const {
         open,
         openFixedRange,
-        openFixedRangeWithTime,
         openDateToNow,
         openFixedDate,
         close,
@@ -128,7 +127,6 @@ export function DateFilter({
         rangeDateTo,
         label,
         isFixedRange,
-        isFixedRangeWithTime,
         isDateToNow,
         isFixedDate,
         isRollingDateRange,
@@ -140,20 +138,39 @@ export function DateFilter({
     const [granularity, setGranularity] = useState<LemonCalendarSelectProps['granularity']>(
         forceGranularity ?? (dateFromHasTimePrecision ? 'minute' : 'day')
     )
+    const [fixedRangeGranularity, setFixedRangeGranularity] = useState<'day' | 'minute'>(
+        dateFromHasTimePrecision ? 'minute' : 'day'
+    )
+
+    const showFixedRangeTimeToggle = allowTimePrecision || allowFixedRangeWithTime
 
     const popoverOverlay =
         view === DateFilterView.FixedRange ? (
-            <LemonCalendarRange
-                value={[rangeDateFrom ?? dayjs(), rangeDateTo ?? dayjs()]}
-                onChange={([from, to]) => {
-                    setRangeDateFrom(from)
-                    setRangeDateTo(to)
-                    setExplicitDate(false)
-                    applyRange()
-                }}
-                onClose={open}
-                months={2}
-            />
+            fixedRangeGranularity === 'minute' ? (
+                <FixedRangeWithTimePicker
+                    rangeDateFrom={rangeDateFrom}
+                    rangeDateTo={rangeDateTo}
+                    setDate={setDate}
+                    onClose={open}
+                    use24HourFormat={use24HourFormat}
+                    showTimeToggle={showFixedRangeTimeToggle}
+                    onToggleTime={(includeTime) => setFixedRangeGranularity(includeTime ? 'minute' : 'day')}
+                />
+            ) : (
+                <LemonCalendarRange
+                    value={[rangeDateFrom ?? dayjs(), rangeDateTo ?? dayjs()]}
+                    onChange={([from, to]) => {
+                        setRangeDateFrom(from)
+                        setRangeDateTo(to)
+                        setExplicitDate(false)
+                        applyRange()
+                    }}
+                    onClose={open}
+                    months={2}
+                    showTimeToggle={showFixedRangeTimeToggle}
+                    onToggleTime={(includeTime) => setFixedRangeGranularity(includeTime ? 'minute' : 'day')}
+                />
+            )
         ) : view === DateFilterView.FixedRangeWithTime ? (
             <FixedRangeWithTimePicker
                 rangeDateFrom={rangeDateFrom}
@@ -263,14 +280,9 @@ export function DateFilter({
                         <LemonButton onClick={openDateToNow} active={isDateToNow} fullWidth>
                             From custom date until now…
                         </LemonButton>
-                        <LemonButton onClick={openFixedRange} active={isFixedRange && !isFixedRangeWithTime} fullWidth>
+                        <LemonButton onClick={openFixedRange} active={isFixedRange} fullWidth>
                             Custom fixed date range…
                         </LemonButton>
-                        {allowFixedRangeWithTime && (
-                            <LemonButton onClick={openFixedRangeWithTime} active={isFixedRangeWithTime} fullWidth>
-                                Custom fixed date range with time…
-                            </LemonButton>
-                        )}
                     </>
                 )}
                 {showExplicitDateToggle && (
