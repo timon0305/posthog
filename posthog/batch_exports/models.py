@@ -1,6 +1,7 @@
 import datetime as dt
 from datetime import timedelta
 from math import ceil
+from zoneinfo import ZoneInfo
 
 from django.db import models
 
@@ -286,6 +287,11 @@ class BatchExport(ModelActivityMixin, UUIDTModel):
         raise ValueError(f"Invalid interval: '{self.interval}'")
 
     @property
+    def timezone_info(self) -> ZoneInfo:
+        """Return the timezone info for this batch export."""
+        return ZoneInfo(self.timezone or "UTC")
+
+    @property
     def offset_day(self) -> int | None:
         """Return the offset day for this batch export.
 
@@ -300,11 +306,26 @@ class BatchExport(ModelActivityMixin, UUIDTModel):
         return None
 
     @property
+    def offset_day_name(self) -> str | None:
+        """Return the offset day name for this batch export.
+
+        For a weekly schedule, this is the name of the day to start at (Sunday, Monday, etc.).
+        For all other intervals, this is None.
+        """
+        if self.offset_day is None:
+            return None
+        day_names = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"]
+        return day_names[self.offset_day]
+
+    @property
     def offset_hour(self) -> int | None:
         """Return the offset hour for this batch export.
 
         For a daily or weekly schedule, this is the hour to start at (0-23).
         For all other intervals, this is None.
+
+        Note: we don't support sub-hour offsets at the moment so we can assume the offset is always an
+        integer number of hours.
         """
         if self.interval == "day" or self.interval == "week":
             if self.interval_offset is None:
