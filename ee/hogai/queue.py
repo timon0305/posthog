@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import time
 import asyncio
+import builtins
 from contextlib import asynccontextmanager, contextmanager
 from dataclasses import dataclass
 from typing import Any, TypedDict, cast
@@ -45,7 +46,10 @@ class ConversationQueueStore:
     def _lock(self, timeout: float = 5.0):
         cache = caches["default"]
         lock_key = self._lock_key()
+        start_time = time.monotonic()
         while not cache.add(lock_key, "1", timeout=timeout):
+            if time.monotonic() - start_time > timeout:
+                raise TimeoutError(f"Failed to acquire lock after {timeout}s")
             time.sleep(0.01)
         try:
             yield
@@ -56,35 +60,38 @@ class ConversationQueueStore:
     async def _async_lock(self, timeout: float = 5.0):
         cache = caches["default"]
         lock_key = self._lock_key()
+        start_time = time.monotonic()
         while not cache.add(lock_key, "1", timeout=timeout):
+            if time.monotonic() - start_time > timeout:
+                raise TimeoutError(f"Failed to acquire lock after {timeout}s")
             await asyncio.sleep(0.01)
         try:
             yield
         finally:
             cache.delete(lock_key)
 
-    def list(self) -> list[ConversationQueueMessage]:
+    def list(self) -> builtins.list[ConversationQueueMessage]:
         cache = caches["default"]
         queue = cache.get(self._cache_key())
         if isinstance(queue, list):
             return cast(list[ConversationQueueMessage], queue)
         return []
 
-    def save(self, queue_messages: list[ConversationQueueMessage]) -> None:
+    def save(self, queue_messages: builtins.list[ConversationQueueMessage]) -> None:
         cache = caches["default"]
         cache.set(self._cache_key(), queue_messages, timeout=self.cache_timeout_seconds)
 
-    def clear(self) -> list[ConversationQueueMessage]:
+    def clear(self) -> builtins.list[ConversationQueueMessage]:
         with self._lock():
             self.save([])
             return []
 
-    async def clear_async(self) -> list[ConversationQueueMessage]:
+    async def clear_async(self) -> builtins.list[ConversationQueueMessage]:
         async with self._async_lock():
             self.save([])
             return []
 
-    def enqueue(self, message: ConversationQueueMessage) -> list[ConversationQueueMessage]:
+    def enqueue(self, message: ConversationQueueMessage) -> builtins.list[ConversationQueueMessage]:
         with self._lock():
             queue = self.list()
             if len(queue) >= self.max_messages:
@@ -93,7 +100,7 @@ class ConversationQueueStore:
             self.save(queue)
             return queue
 
-    def update(self, queue_id: str, content: str) -> list[ConversationQueueMessage]:
+    def update(self, queue_id: str, content: str) -> builtins.list[ConversationQueueMessage]:
         with self._lock():
             queue = self.list()
             for index, item in enumerate(queue):
@@ -103,7 +110,7 @@ class ConversationQueueStore:
                     return queue
             return queue
 
-    def delete(self, queue_id: str) -> list[ConversationQueueMessage]:
+    def delete(self, queue_id: str) -> builtins.list[ConversationQueueMessage]:
         with self._lock():
             queue = [item for item in self.list() if item.get("id") != queue_id]
             self.save(queue)
@@ -127,7 +134,7 @@ class ConversationQueueStore:
             self.save(queue)
             return message
 
-    def requeue_front(self, message: ConversationQueueMessage) -> list[ConversationQueueMessage]:
+    def requeue_front(self, message: ConversationQueueMessage) -> builtins.list[ConversationQueueMessage]:
         with self._lock():
             queue = self.list()
             if len(queue) >= self.max_messages:
@@ -136,7 +143,7 @@ class ConversationQueueStore:
             self.save(queue)
             return queue
 
-    async def requeue_front_async(self, message: ConversationQueueMessage) -> list[ConversationQueueMessage]:
+    async def requeue_front_async(self, message: ConversationQueueMessage) -> builtins.list[ConversationQueueMessage]:
         async with self._async_lock():
             queue = self.list()
             if len(queue) >= self.max_messages:

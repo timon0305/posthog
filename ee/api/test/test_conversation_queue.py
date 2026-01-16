@@ -7,7 +7,7 @@ from rest_framework import status
 from posthog.models import Team
 from posthog.models.user import User
 
-from ee.hogai.queue import ConversationQueueStore
+from ee.hogai.queue import ConversationQueueStore, build_queue_message
 from ee.models.assistant import Conversation
 
 
@@ -111,7 +111,7 @@ class TestConversationQueue(APIBaseTest):
 
     def test_queue_store_consistency_after_clear(self):
         store = ConversationQueueStore(str(self.conversation.id))
-        store.enqueue({"id": "queue-1", "content": "hello"})
+        store.enqueue(build_queue_message(content="hello"))
 
         response = self.client.post(f"{self.queue_url}clear/")
 

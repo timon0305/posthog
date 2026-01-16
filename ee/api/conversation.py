@@ -77,7 +77,8 @@ class MessageSerializer(MessageMinimalSerializer):
     agent_mode = serializers.ChoiceField(required=False, choices=[mode.value for mode in AgentMode])
     resume_payload = serializers.JSONField(required=False, allow_null=True)
 
-    def validate(self, data):
+    def validate(self, attrs):
+        data = attrs
         if data["content"] is not None:
             try:
                 message = HumanMessage.model_validate(
@@ -120,7 +121,8 @@ class QueueMessageSerializer(serializers.Serializer):
     billing_context = serializers.JSONField(required=False)
     agent_mode = serializers.ChoiceField(required=False, choices=[mode.value for mode in AgentMode])
 
-    def validate(self, data):
+    def validate(self, attrs):
+        data = attrs
         try:
             HumanMessage.model_validate(
                 {
@@ -147,6 +149,10 @@ class QueueMessageSerializer(serializers.Serializer):
                 raise serializers.ValidationError("Invalid agent mode.")
 
         return data
+
+
+class QueueMessageUpdateSerializer(serializers.Serializer):
+    content = serializers.CharField(required=True, allow_blank=False, max_length=40000)
 
 
 @extend_schema(tags=["max"])
@@ -376,7 +382,7 @@ class ConversationViewSet(TeamAndOrgViewSetMixin, ListModelMixin, RetrieveModelM
             return Response({"detail": "Queue message not found."}, status=status.HTTP_404_NOT_FOUND)
 
         if request.method == "PATCH":
-            serializer = QueueMessageSerializer(data=request.data)
+            serializer = QueueMessageUpdateSerializer(data=request.data)
             serializer.is_valid(raise_exception=True)
             queue = queue_store.update(queue_id, serializer.validated_data["content"])
         else:

@@ -4,7 +4,7 @@ import { offset } from '@floating-ui/react'
 import clsx from 'clsx'
 import { useActions, useValues } from 'kea'
 import posthog from 'posthog-js'
-import React, { ReactNode, useEffect, useRef, useState } from 'react'
+import React, { ReactNode, useEffect, useMemo, useRef, useState } from 'react'
 
 import { IconArrowRight, IconCheck, IconPencil, IconStopFilled, IconTrash, IconX } from '@posthog/icons'
 import { LemonButton, LemonSwitch, LemonTextArea } from '@posthog/lemon-ui'
@@ -41,14 +41,12 @@ function QueuedMessageItem({
     isEditing,
     onEdit,
     onCancel,
-    focusOnEdit,
     onSave,
 }: {
     message: ConversationQueueMessage
     isEditing: boolean
     onEdit: () => void
     onCancel: () => void
-    focusOnEdit: boolean
     onSave: (messageId: string, content: string) => void
 }): JSX.Element {
     const { deleteQueuedMessage } = useActions(maxThreadLogic)
@@ -60,11 +58,11 @@ function QueuedMessageItem({
     }, [message.content])
 
     useEffect(() => {
-        if (isEditing && focusOnEdit) {
+        if (isEditing) {
             textAreaRef.current?.focus()
             textAreaRef.current?.select()
         }
-    }, [focusOnEdit, isEditing])
+    }, [isEditing])
 
     const canSave = draft.trim().length > 0
 
@@ -167,7 +165,7 @@ export const QuestionInput = React.forwardRef<HTMLDivElement, QuestionInputProps
 
     const [showAutocomplete, setShowAutocomplete] = useState(false)
     const [editingQueueId, setEditingQueueId] = useState<string | null>(null)
-    const [shouldFocusQueueEdit, setShouldFocusQueueEdit] = useState(false)
+    const displayQueuedMessages = useMemo(() => [...queuedMessages].reverse(), [queuedMessages])
     const hasQuestion = question.trim().length > 0
     const isQueueingSubmission = queueingEnabled && threadLoading && hasQuestion
     const showStopButton = threadLoading && !isQueueingSubmission
@@ -220,33 +218,27 @@ export const QuestionInput = React.forwardRef<HTMLDivElement, QuestionInputProps
                         <div className="px-3 py-2">
                             <div className="text-xs text-muted mb-1.5">Up next</div>
                             <div className="space-y-1.5">
-                                {queuedMessages
-                                    .slice()
-                                    .reverse()
-                                    .map((message) => (
-                                        <QueuedMessageItem
-                                            key={message.id}
-                                            message={message}
-                                            isEditing={editingQueueId === message.id}
-                                            onEdit={() => {
-                                                setEditingQueueId(message.id)
-                                                setShouldFocusQueueEdit(true)
-                                            }}
-                                            onCancel={() => {
-                                                setEditingQueueId(null)
-                                                setShouldFocusQueueEdit(false)
-                                            }}
-                                            focusOnEdit={shouldFocusQueueEdit && editingQueueId === message.id}
-                                            onSave={(messageId, content) => {
-                                                updateQueuedMessage(messageId, content)
-                                                setEditingQueueId(null)
-                                                setShouldFocusQueueEdit(false)
-                                            }}
-                                        />
-                                    ))}
+                                {displayQueuedMessages.map((message) => (
+                                    <QueuedMessageItem
+                                        key={message.id}
+                                        message={message}
+                                        isEditing={editingQueueId === message.id}
+                                        onEdit={() => {
+                                            setEditingQueueId(message.id)
+                                        }}
+                                        onCancel={() => {
+                                            setEditingQueueId(null)
+                                        }}
+                                        onSave={(messageId, content) => {
+                                            updateQueuedMessage(messageId, content)
+                                            setEditingQueueId(null)
+                                        }}
+                                    />
+                                ))}
                             </div>
                         </div>
                     )}
+
                     <label
                         htmlFor="question-input"
                         className={clsx(
@@ -314,9 +306,18 @@ export const QuestionInput = React.forwardRef<HTMLDivElement, QuestionInputProps
                                             queuedMessages.length > 0 &&
                                             !editingQueueId
                                         ) {
+                                            const target = event.currentTarget
+                                            const atStart = target.selectionStart === 0 && target.selectionEnd === 0
+                                            const isSingleLine = target.value.split('\n').length <= 1
+                                            if (!atStart || !isSingleLine) {
+                                                return
+                                            }
+                                            const nextMessageId = queuedMessages[0]?.id
+                                            if (!nextMessageId) {
+                                                return
+                                            }
                                             event.preventDefault()
-                                            setEditingQueueId(queuedMessages[0].id)
-                                            setShouldFocusQueueEdit(true)
+                                            setEditingQueueId(nextMessageId)
                                         }
                                     }}
                                     disabled={inputDisabled}
