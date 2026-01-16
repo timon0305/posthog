@@ -1408,3 +1408,91 @@ class TestTraceQueryRunner(ClickhouseTestMixin, BaseTest):
         self.assertEqual(len(response.results), 1)
         # Should sum: Span A (100) + Generation B (200) = 300, exclude Generation A1
         self.assertEqual(response.results[0].totalLatency, 300.0)
+
+    def test_time_to_first_token_in_event_properties(self):
+        """Test that $ai_time_to_first_token property is preserved in event properties."""
+        _create_person(distinct_ids=["person1"], team=self.team)
+        trace_id = "trace_with_ttft"
+
+        _create_ai_generation_event(
+            distinct_id="person1",
+            trace_id=trace_id,
+            team=self.team,
+            timestamp=datetime(2024, 12, 1, 0, 0),
+            properties={
+                "$ai_latency": 2.5,
+                "$ai_time_to_first_token": 0.15,
+                "$ai_model": "gpt-4",
+            },
+        )
+
+        response = TraceQueryRunner(
+            team=self.team,
+            query=TraceQuery(
+                traceId=trace_id,
+                dateRange=DateRange(date_from="2024-12-01T00:00:00Z", date_to="2024-12-01T01:00:00Z"),
+            ),
+        ).calculate()
+
+        self.assertEqual(len(response.results), 1)
+        self.assertEqual(len(response.results[0].events), 1)
+        event = response.results[0].events[0]
+        self.assertEqual(event.properties["$ai_time_to_first_token"], 0.15)
+        self.assertEqual(event.properties["$ai_latency"], 2.5)
+
+    def test_time_to_first_token_multiple_generations(self):
+        """Test TTFT with multiple generation events in a trace."""
+        _create_person(distinct_ids=["person1"], team=self.team)
+        trace_id = "trace_multiple_ttft"
+
+        # First generation with TTFT
+        _create_ai_generation_event(
+            distinct_id="person1",
+            trace_id=trace_id,
+            team=self.team,
+            timestamp=datetime(2024, 12, 1, 0, 0),
+            properties={
+                "$ai_latency": 2.0,
+                "$ai_time_to_first_token": 0.2,
+            },
+        )
+
+        # Second generation with faster TTFT
+        _create_ai_generation_event(
+            distinct_id="person1",
+            trace_id=trace_id,
+            team=self.team,
+            timestamp=datetime(2024, 12, 1, 0, 1),
+            properties={
+                "$ai_latency": 1.5,
+                "$ai_time_to_first_token": 0.1,
+            },
+        )
+
+        # Third generation without TTFT (non-streaming)
+        _create_ai_generation_event(
+            distinct_id="person1",
+            trace_id=trace_id,
+            team=self.team,
+            timestamp=datetime(2024, 12, 1, 0, 2),
+            properties={
+                "$ai_latency": 1.0,
+            },
+        )
+
+        response = TraceQueryRunner(
+            team=self.team,
+            query=TraceQuery(
+                traceId=trace_id,
+                dateRange=DateRange(date_from="2024-12-01T00:00:00Z", date_to="2024-12-01T01:00:00Z"),
+            ),
+        ).calculate()
+
+        self.assertEqual(len(response.results), 1)
+        self.assertEqual(len(response.results[0].events), 3)
+
+        # Verify each event has the correct TTFT value
+        events = response.results[0].events
+        self.assertEqual(events[0].properties.get("$ai_time_to_first_token"), 0.2)
+        self.assertEqual(events[1].properties.get("$ai_time_to_first_token"), 0.1)
+        self.assertIsNone(events[2].properties.get("$ai_time_to_first_token"))

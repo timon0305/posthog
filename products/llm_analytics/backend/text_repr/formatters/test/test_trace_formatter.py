@@ -82,6 +82,23 @@ class TestGetEventSummary:
         summary = _get_event_summary(event)
         assert "claude-3" in summary
 
+    def test_generation_summary_with_time_to_first_token(self):
+        """Should include TTFT in generation summary."""
+        event = {
+            "event": "$ai_generation",
+            "properties": {
+                "$ai_span_name": "streaming-gen",
+                "$ai_latency": 2.5,
+                "$ai_time_to_first_token": 0.15,
+                "$ai_model": "gpt-4",
+            },
+        }
+        summary = _get_event_summary(event)
+        assert "streaming-gen" in summary
+        assert "2.50s" in summary
+        assert "TTFT: 0.15s" in summary
+        assert "gpt-4" in summary
+
     def test_span_summary_full(self):
         """Should create span summary with all metrics."""
         event = {
