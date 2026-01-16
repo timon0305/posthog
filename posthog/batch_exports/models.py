@@ -285,6 +285,34 @@ class BatchExport(ModelActivityMixin, UUIDTModel):
 
         raise ValueError(f"Invalid interval: '{self.interval}'")
 
+    @property
+    def offset_day(self) -> int | None:
+        """Return the offset day for this batch export.
+
+        For a weekly schedule, this is the day of the week to start at (0-6, where 0 is Sunday).
+        Sunday is 0 since this is what is used by Temporal and Sunday is also the default week start day in PostHog.
+        For all other intervals, this is None.
+        """
+        if self.interval == "week":
+            if self.interval_offset is None:
+                return 0  # default to Sunday
+            return self.interval_offset // (24 * 3600)
+        return None
+
+    @property
+    def offset_hour(self) -> int | None:
+        """Return the offset hour for this batch export.
+
+        For a daily or weekly schedule, this is the hour to start at (0-23).
+        For all other intervals, this is None.
+        """
+        if self.interval == "day" or self.interval == "week":
+            if self.interval_offset is None:
+                return 0  # default to midnight
+            offset_in_hours = self.interval_offset // 3600
+            return offset_in_hours % 24
+        return None
+
 
 class BatchExportBackfill(UUIDTModel):
     class Status(models.TextChoices):
