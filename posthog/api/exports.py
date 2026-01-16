@@ -19,7 +19,7 @@ from temporalio.common import RetryPolicy, WorkflowIDReusePolicy
 from posthog.api.routing import TeamAndOrgViewSetMixin
 from posthog.api.utils import action
 from posthog.event_usage import groups
-from posthog.models import Insight, User
+from posthog.models import Insight, Team, User
 from posthog.models.activity_logging.activity_log import Change, Detail, log_activity
 from posthog.models.exported_asset import ExportedAsset, get_content_response
 from posthog.settings import HOGQL_INCREASED_MAX_EXECUTION_TIME
@@ -119,14 +119,17 @@ class ExportedAssetSerializer(serializers.ModelSerializer):
                 created_at__gte=start_of_month,
             ).count()
 
-            if (
-                not self.context["request"].user.is_staff
-                and existing_full_video_exports_count >= FULL_VIDEO_EXPORTS_LIMIT_PER_TEAM
-            ):
+            # Get team-specific limit from extra_settings, fallback to default
+            team = Team.objects.get(id=self.context["team_id"])
+            team_limit = FULL_VIDEO_EXPORTS_LIMIT_PER_TEAM
+            if team.extra_settings and "full_video_exports_limit" in team.extra_settings:
+                team_limit = team.extra_settings["full_video_exports_limit"]
+
+            if not self.context["request"].user.is_staff and existing_full_video_exports_count >= team_limit:
                 raise ValidationError(
                     {
                         "export_limit_exceeded": [
-                            f"Your team has reached the limit of {FULL_VIDEO_EXPORTS_LIMIT_PER_TEAM} full video exports this month."
+                            f"Your team has reached the limit of {team_limit} full video exports this month."
                         ]
                     }
                 )
