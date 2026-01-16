@@ -946,6 +946,71 @@ export const llmAnalyticsLogic = kea<llmAnalyticsLogicType>([
                     },
                 },
                 {
+                    title: 'Time to first token by model (median)',
+                    description: 'Streaming requests only',
+                    query: {
+                        kind: NodeKind.TrendsQuery,
+                        series: [
+                            {
+                                event: '$ai_generation',
+                                name: '$ai_generation',
+                                math: PropertyMathType.Median,
+                                kind: NodeKind.EventsNode,
+                                math_property: '$ai_time_to_first_token',
+                                properties: [
+                                    {
+                                        type: PropertyFilterType.Event,
+                                        key: '$ai_stream',
+                                        operator: PropertyOperator.Exact,
+                                        value: 'true',
+                                    },
+                                ],
+                            },
+                        ],
+                        breakdownFilter: {
+                            breakdown: '$ai_model',
+                        },
+                        trendsFilter: {
+                            aggregationAxisPostfix: ' s',
+                            decimalPlaces: 3,
+                        },
+                        dateRange: { date_from: dashboardDateFilter.dateFrom, date_to: dashboardDateFilter.dateTo },
+                        properties: propertyFilters,
+                        filterTestAccounts: shouldFilterTestAccounts,
+                    },
+                    context: {
+                        groupTypeLabel: 'generations',
+                        insightProps: {
+                            dashboardItemId: `new-generation-ttft-by-model-query`,
+                        },
+                        onDataPointClick: (series) => {
+                            if (typeof series.day === 'string') {
+                                const { date_from, date_to } = getDayDateRange(series.day)
+                                router.actions.push(urls.llmAnalyticsGenerations(), {
+                                    ...router.values.searchParams,
+                                    date_from,
+                                    date_to,
+                                    filters: [
+                                        ...(router.values.searchParams.filters || []),
+                                        {
+                                            type: PropertyFilterType.Event,
+                                            key: '$ai_model',
+                                            operator: PropertyOperator.Exact,
+                                            value: series.breakdown as string,
+                                        },
+                                        {
+                                            type: PropertyFilterType.Event,
+                                            key: '$ai_stream',
+                                            operator: PropertyOperator.Exact,
+                                            value: 'true',
+                                        },
+                                    ] as AnyPropertyFilter[],
+                                })
+                            }
+                        },
+                    },
+                },
+                {
                     title: 'Generations by HTTP status',
                     query: {
                         kind: NodeKind.TrendsQuery,
@@ -1287,6 +1352,7 @@ export const llmAnalyticsLogic = kea<llmAnalyticsLogicType>([
                     countIf(properties.$ai_is_error = 'true') as errors,
                     round(sum(toFloat(properties.$ai_total_cost_usd)), 4) as total_cost,
                     round(sum(toFloat(properties.$ai_latency)), 2) as total_latency,
+                    round(minIf(toFloat(properties.$ai_time_to_first_token), toFloat(properties.$ai_time_to_first_token) > 0), 3) as min_ttft,
                     min(timestamp) as first_seen,
                     max(timestamp) as last_seen
                 FROM events
@@ -1316,6 +1382,7 @@ export const llmAnalyticsLogic = kea<llmAnalyticsLogicType>([
                     'errors',
                     'total_cost',
                     'total_latency',
+                    'min_ttft',
                     'first_seen',
                     'last_seen',
                 ],

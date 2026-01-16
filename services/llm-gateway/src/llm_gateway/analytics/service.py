@@ -70,6 +70,7 @@ class LLMAnalyticsService:
         response: dict[str, Any] | None = None,
         error: Exception | None = None,
         is_streaming: bool = False,
+        time_to_first_token_seconds: float | None = None,
         input_tokens_field: str = "input_tokens",
         output_tokens_field: str = "output_tokens",
         trace_id: str | None = None,
@@ -114,6 +115,9 @@ class LLMAnalyticsService:
 
             if output_choices:
                 properties["$ai_output_choices"] = output_choices
+
+            if time_to_first_token_seconds is not None:
+                properties["$ai_time_to_first_token"] = time_to_first_token_seconds
 
             if error:
                 properties["$ai_is_error"] = True
