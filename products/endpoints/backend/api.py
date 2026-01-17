@@ -200,7 +200,8 @@ class EndpointViewSet(TeamAndOrgViewSetMixin, PydanticModelMixin, viewsets.Model
         try:
             parse_select(query_string)
         except Exception as e:
-            raise ValidationError({"query": f"Invalid HogQL query: {e}"})
+            capture_exception(e)
+            raise ValidationError({"query": "Invalid HogQL query."})
 
     def validate_request(self, data: EndpointRequest, strict: bool = True) -> None:
         query = data.query
