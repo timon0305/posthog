@@ -8,12 +8,13 @@ from ee.hogai.context import AssistantContextManager
 from ee.hogai.core.agent_modes.factory import AgentModeDefinition
 from ee.hogai.core.agent_modes.mode_manager import AgentModeManager
 from ee.hogai.core.agent_modes.presets.error_tracking import error_tracking_agent
+from ee.hogai.core.agent_modes.presets.flags import flags_agent
 from ee.hogai.core.agent_modes.presets.product_analytics import product_analytics_agent
 from ee.hogai.core.agent_modes.presets.session_replay import session_replay_agent
 from ee.hogai.core.agent_modes.presets.sql import sql_agent
 from ee.hogai.core.agent_modes.prompt_builder import AgentPromptBuilder
 from ee.hogai.core.agent_modes.toolkit import AgentToolkit, AgentToolkitManager
-from ee.hogai.utils.feature_flags import has_error_tracking_mode_feature_flag
+from ee.hogai.utils.feature_flags import has_error_tracking_mode_feature_flag, has_flags_mode_feature_flag
 from ee.hogai.utils.types.base import AssistantState, NodePath
 
 # Default mode registry for normal chat agent operation
@@ -47,6 +48,8 @@ class ChatAgentModeManager(AgentModeManager):
         registry = dict(DEFAULT_CHAT_AGENT_MODE_REGISTRY)
         if has_error_tracking_mode_feature_flag(self._team, self._user):
             registry[AgentMode.ERROR_TRACKING] = error_tracking_agent
+        if has_flags_mode_feature_flag(self._team, self._user):
+            registry[AgentMode.FLAGS] = flags_agent
         return registry
 
     @property
