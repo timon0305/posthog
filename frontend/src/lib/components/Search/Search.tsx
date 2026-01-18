@@ -406,7 +406,7 @@ function SearchInput({ autoFocus, className }: SearchInputProps): JSX.Element {
                 }
             }
         },
-        [highlightedItemRef]
+        []
     )
 
     useEffect(() => {
