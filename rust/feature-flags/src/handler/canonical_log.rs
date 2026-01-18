@@ -119,12 +119,14 @@ pub struct FlagsCanonicalLogLine {
     /// These errors (like missing dependencies or cycles) set errors_while_computing_flags=true
     /// in the response but don't increment flags_errored.
     pub dependency_graph_errors: usize,
-    pub hash_key_override_attempted: bool,
-    pub hash_key_override_succeeded: bool,
-    /// True when experience continuity lookup was skipped due to optimization.
-    /// This is set when flags have experience continuity enabled but don't need
-    /// a hash key lookup (100% rollout with no multivariate variants).
-    pub hash_key_override_skipped: bool,
+    /// Status of hash key override lookup for experience continuity.
+    /// Values:
+    /// - None: no flags require experience continuity
+    /// - "skipped": optimization applied (100% rollout, no variants needing lookup)
+    /// - "error": query failed
+    /// - "empty": query succeeded, no overrides found
+    /// - "found": query succeeded, overrides returned
+    pub hash_key_override_status: Option<&'static str>,
 
     // Rate limiting
     pub rate_limited: bool,
@@ -169,9 +171,7 @@ impl Default for FlagsCanonicalLogLine {
             cohorts_evaluated: 0,
             flags_errored: 0,
             dependency_graph_errors: 0,
-            hash_key_override_attempted: false,
-            hash_key_override_succeeded: false,
-            hash_key_override_skipped: false,
+            hash_key_override_status: None,
             rate_limited: false,
             team_cache_source: None,
             http_status: 200,
@@ -226,9 +226,7 @@ impl FlagsCanonicalLogLine {
             cohorts_evaluated = self.cohorts_evaluated,
             flags_errored = self.flags_errored,
             dependency_graph_errors = self.dependency_graph_errors,
-            hash_key_override_attempted = self.hash_key_override_attempted,
-            hash_key_override_succeeded = self.hash_key_override_succeeded,
-            hash_key_override_skipped = self.hash_key_override_skipped,
+            hash_key_override_status = self.hash_key_override_status,
             rate_limited = self.rate_limited,
             team_cache_source = self.team_cache_source,
             error_code = self.error_code,
@@ -286,9 +284,7 @@ mod tests {
         assert_eq!(log.cohorts_evaluated, 0);
         assert_eq!(log.flags_errored, 0);
         assert_eq!(log.dependency_graph_errors, 0);
-        assert!(!log.hash_key_override_attempted);
-        assert!(!log.hash_key_override_succeeded);
-        assert!(!log.hash_key_override_skipped);
+        assert!(log.hash_key_override_status.is_none());
         assert!(!log.rate_limited);
         assert!(log.team_cache_source.is_none());
         assert_eq!(log.http_status, 200);
@@ -321,8 +317,7 @@ mod tests {
         log.property_cache_misses = 2;
         log.cohorts_evaluated = 4;
         log.flags_errored = 1;
-        log.hash_key_override_attempted = true;
-        log.hash_key_override_succeeded = true;
+        log.hash_key_override_status = Some("found");
         log.rate_limited = false;
         log.team_cache_source = Some("redis");
         log.http_status = 200;
@@ -371,16 +366,14 @@ mod tests {
             with_canonical_log(|l| {
                 l.db_property_fetches = 3;
                 l.cohorts_evaluated = 5;
-                l.hash_key_override_attempted = true;
-                l.hash_key_override_succeeded = true;
+                l.hash_key_override_status = Some("found");
             });
         })
         .await;
 
         assert_eq!(final_log.db_property_fetches, 3);
         assert_eq!(final_log.cohorts_evaluated, 5);
-        assert!(final_log.hash_key_override_attempted);
-        assert!(final_log.hash_key_override_succeeded);
+        assert_eq!(final_log.hash_key_override_status, Some("found"));
     }
 
     #[tokio::test]
