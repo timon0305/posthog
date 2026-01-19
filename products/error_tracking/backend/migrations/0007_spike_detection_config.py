@@ -6,7 +6,6 @@ from django.db import migrations, models
 
 class Migration(migrations.Migration):
     dependencies = [
-        ("posthog", "0969_add_oauth_is_verified"),
         ("error_tracking", "0006_frame_idx_removal"),
     ]
 
