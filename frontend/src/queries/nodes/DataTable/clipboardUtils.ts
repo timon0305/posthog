@@ -5,7 +5,7 @@ import { lemonToast } from '@posthog/lemon-ui'
 import { copyToClipboard } from 'lib/utils/copyToClipboard'
 import { asDisplay } from 'scenes/persons/person-utils'
 
-import { extractExpressionComment } from '~/queries/nodes/DataTable/utils'
+import { extractDisplayLabel } from '~/queries/nodes/DataTable/utils'
 import { DataTableNode } from '~/queries/schema/schema-general'
 import {
     isEventsQuery,
@@ -80,7 +80,7 @@ const processRowData = (row: DataTableRow, columns: string[], query: DataTableNo
             let value = Array.isArray(row.result)
                 ? row.result[colIndex]
                 : (row.result as Record<string, any>)?.[colIndex]
-            const colName = extractExpressionComment(col)
+            const colName = extractDisplayLabel(col)
 
             if (col === 'person') {
                 value = asDisplay(value)
@@ -172,7 +172,7 @@ export const getJsonTableData = (
                         return acc
                     }
 
-                    const colName = extractExpressionComment(col)
+                    const colName = extractDisplayLabel(col)
 
                     acc[colName] = Array.isArray(n.result)
                         ? n.result[colIndex]

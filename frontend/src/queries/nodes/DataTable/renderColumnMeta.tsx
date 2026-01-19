@@ -3,7 +3,7 @@ import { TaxonomicFilterGroupType } from 'lib/components/TaxonomicFilter/types'
 import { SortingIndicator } from 'lib/lemon-ui/LemonTable/sorting'
 
 import { QueryFeature, getQueryFeatures } from '~/queries/nodes/DataTable/queryFeatures'
-import { extractExpressionComment, removeExpressionComment } from '~/queries/nodes/DataTable/utils'
+import { extractDisplayLabel, removeExpressionComment } from '~/queries/nodes/DataTable/utils'
 import {
     DataTableNode,
     DataVisualizationNode,
@@ -89,7 +89,7 @@ export function renderColumnMeta<T extends DataVisualizationNode | DataTableNode
     } else if (queryContextColumnName) {
         title = queryContextColumnName.replace('_', ' ')
     } else {
-        title = queryFeatures.has(QueryFeature.selectAndOrderByColumns) ? extractExpressionComment(key) : key
+        title = queryFeatures.has(QueryFeature.selectAndOrderByColumns) ? extractDisplayLabel(key) : key
     }
 
     if (queryContextColumn?.align) {

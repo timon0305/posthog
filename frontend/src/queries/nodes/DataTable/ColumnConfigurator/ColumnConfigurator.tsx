@@ -36,7 +36,7 @@ import {
 } from '~/queries/utils'
 import { GroupTypeIndex, PropertyFilterType } from '~/types'
 
-import { defaultDataTableColumns, extractExpressionComment, removeExpressionComment } from '../utils'
+import { defaultDataTableColumns, extractDisplayLabel, removeExpressionComment } from '../utils'
 import { ColumnConfiguratorLogicProps, columnConfiguratorLogic } from './columnConfiguratorLogic'
 
 let uniqueNode = 0
@@ -292,7 +292,7 @@ const SelectedColumn = ({
         columnKey = column.substring(8)
     }
 
-    columnKey = trimQuotes(extractExpressionComment(columnKey))
+    columnKey = trimQuotes(extractDisplayLabel(columnKey))
 
     return (
         <div

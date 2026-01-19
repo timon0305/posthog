@@ -40,7 +40,7 @@ import { QueryFeature } from '~/queries/nodes/DataTable/queryFeatures'
 import { getContextColumn, renderColumn } from '~/queries/nodes/DataTable/renderColumn'
 import { renderColumnMeta } from '~/queries/nodes/DataTable/renderColumnMeta'
 import {
-    extractExpressionComment,
+    extractDisplayLabel,
     getDataNodeDefaultColumns,
     removeExpressionComment,
 } from '~/queries/nodes/DataTable/utils'
@@ -320,8 +320,8 @@ export function DataTable({
                     !isReadOnly && showActions && sourceFeatures.has(QueryFeature.selectAndOrderByColumns) ? (
                         <>
                             <div className="px-2 py-1 max-w-md">
-                                <div className="font-mono font-bold truncate">{extractExpressionComment(key)}</div>
-                                {extractExpressionComment(key) !== removeExpressionComment(key) && (
+                                <div className="font-mono font-bold truncate">{extractDisplayLabel(key)}</div>
+                                {extractDisplayLabel(key) !== removeExpressionComment(key) && (
                                     <div className="font-mono truncate">{removeExpressionComment(key)}</div>
                                 )}
                             </div>
