@@ -2012,6 +2012,7 @@ class IntegrationKind(StrEnum):
     VERCEL = "vercel"
     AZURE_BLOB = "azure-blob"
     FIREBASE = "firebase"
+    JIRA = "jira"
 
 
 class IntervalType(StrEnum):
